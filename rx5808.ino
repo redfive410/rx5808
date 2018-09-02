@@ -76,6 +76,47 @@ void setup() {
 	settings.filterRatioFloat = settings.filterRatio / 1000.0f;
 
 	setRxModule(settings.vtxFreq); // Setup rx module to default frequency
+
+  Serial.println("Start Calibration...");
+}
+
+
+// Main loop
+void loop() {
+  delay(150);
+  state.rssiRaw = rssiRead();
+  state.rssiSmoothed = (settings.filterRatioFloat * (float)state.rssiRaw) + ((1.0f-settings.filterRatioFloat) * state.rssiSmoothed);
+  state.rssi = (int)state.rssiSmoothed;
+  
+  state.rssiHistory[0] = state.rssiHistory[1];
+  state.rssiHistory[1] = state.rssiHistory[2];
+  state.rssiHistory[2] = state.rssiHistory[3];
+  state.rssiHistory[3] = state.rssiHistory[4];
+  state.rssiHistory[4] = state.rssiHistory[5];
+  state.rssiHistory[5] = state.rssiHistory[6];
+  state.rssiHistory[6] = state.rssiHistory[7];
+  state.rssiHistory[7] = state.rssiHistory[8];
+  state.rssiHistory[8] = state.rssiHistory[9];
+  state.rssiHistory[9] = state.rssi;
+
+  uint32_t rssiHistorySum = 0;
+  for (int i=0; i < 10; i++) {
+    rssiHistorySum += state.rssiHistory[i];
+  }
+
+  if (state.rssi * 10 < rssiHistorySum + 3) {
+    Serial.println("Steady State");
+    state.steady_state = true;
+    if (state.crossing_state == true){
+      state.crossing_state = !state.crossing_state;  
+    }
+  }
+
+  if (state.steady_state == true && state.rssiHistory[0] + 3 < state.rssiHistory[9]) {
+    Serial.println("Crossing Pass Start");
+    state.steady_state = false;
+    state.crossing_state = true;
+  }
 }
 
 // Functions for the rx5808 module
@@ -180,42 +221,4 @@ void setRxModule(int frequency) {
 // Read the RSSI value for the current channel
 int rssiRead() {
 	return analogRead(0);
-}
-
-// Main loop
-void loop() {
-  delay(150);
-  state.rssiRaw = rssiRead();
-	state.rssiSmoothed = (settings.filterRatioFloat * (float)state.rssiRaw) + ((1.0f-settings.filterRatioFloat) * state.rssiSmoothed);
-	state.rssi = (int)state.rssiSmoothed;
-  
-  state.rssiHistory[0] = state.rssiHistory[1];
-  state.rssiHistory[1] = state.rssiHistory[2];
-  state.rssiHistory[2] = state.rssiHistory[3];
-  state.rssiHistory[3] = state.rssiHistory[4];
-  state.rssiHistory[4] = state.rssiHistory[5];
-  state.rssiHistory[5] = state.rssiHistory[6];
-  state.rssiHistory[6] = state.rssiHistory[7];
-  state.rssiHistory[7] = state.rssiHistory[8];
-  state.rssiHistory[8] = state.rssiHistory[9];
-  state.rssiHistory[9] = state.rssi;
-
-  uint32_t rssiHistorySum = 0;
-  for (int i=0; i < 10; i++) {
-    rssiHistorySum += state.rssiHistory[i];
-  }
-
-  if (state.rssi * 10 < rssiHistorySum + 3) {
-    Serial.println("Steady State");
-    state.steady_state = true;
-    if (state.crossing_state == true){
-      state.crossing_state = !state.crossing_state;  
-    }
-  }
-
-  if (state.steady_state == true && state.rssiHistory[0] + 3 < state.rssiHistory[9]) {
-    Serial.println("Crossing Pass Start");
-    state.steady_state = false;
-    state.crossing_state = true;
-  }
 }
